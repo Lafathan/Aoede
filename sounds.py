@@ -1,10 +1,13 @@
 #!/usr/bin/env python3
 from typing import Union
+from fractions import Fraction
 
 import numpy as np
 import soundfile as sf
 
 from player import play
+
+import matplotlib.pyplot as plt
 
 SR = 44100  # default sample rate
 CN = 2  # default channel number
@@ -24,6 +27,7 @@ class Sound(object):
     def __init__(self, data: np.array, samplerate: int):
         self.data = data
         self.samplerate = samplerate
+        self.effects = []
 
     def __getitem__(self, index):
         return self.data[index]
@@ -101,7 +105,7 @@ def ideal_filter(s: Sound, shape: str = 'lowpass', cutoff: Union[float, tuple] =
 
     # calculate the fft
     _freq = np.fft.fftfreq(len(s), d=1.0 / s.samplerate)
-    _fft = np.array([np.fft.fft(s[c]) for c in range(s.channels)])
+    _fft = np.array([np.fft.rfft(s[c]) for c in range(s.channels)])
 
     # apply filter to spectrum
     for i, freq in enumerate(_freq):
@@ -109,6 +113,18 @@ def ideal_filter(s: Sound, shape: str = 'lowpass', cutoff: Union[float, tuple] =
             _fft[j][i] *= mult[func_map[shape](freq)]
 
     # inverse fft
-    s.data[:] = len(s) * np.array([np.fft.ifft(c) for c in _fft])
+    s.data = np.array([np.fft.irfft(c) for c in _fft])
 
+    return
+
+
+def pitch(s: Sound, steps: float = 12):
+    freq_offset = 2**(steps/12.0)
+    if type(s) == Wave:
+        s.frequency *= freq_offset
+        s.generate()
+    else:
+        f = Fraction(freq_offset)
+        up_sample(s, int(f.denominator))
+        decimate(s, int(f.numerator))
     return
